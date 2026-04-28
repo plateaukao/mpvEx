@@ -348,8 +348,8 @@ fun GestureHandler(
           var lastMPVVolumeValue = currentMPVVolume ?: 100
           var lastBrightnessValue = currentBrightness
           val brightnessGestureSens = 0.001f
-          val volumeGestureSens = 0.017f
-          val mpvVolumeGestureSens = 0.017f
+          val volumeGestureSens = 0.07f
+          val mpvVolumeGestureSens = 0.07f
 
           // Original speed for long press
           var originalSpeed = playbackSpeed ?: 1f

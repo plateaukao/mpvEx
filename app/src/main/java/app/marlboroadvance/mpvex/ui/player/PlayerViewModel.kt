@@ -160,7 +160,9 @@ class PlayerViewModel(
   val preciseDuration = _preciseDuration.asStateFlow()
 
   // Audio state
-  val currentVolume = MutableStateFlow(host.audioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
+  // Snap-list volume: low end is fine (steps of 2), high end coarse (steps of 10).
+  private val volumeStops = listOf(0, 2, 4, 6, 8, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100)
+  val currentVolume = MutableStateFlow(50)
   private val volumeBoostCap by MPVLib.propInt["volume-max"].collectAsState(viewModelScope)
 
   init {
@@ -185,7 +187,7 @@ class PlayerViewModel(
       }
     }
   }
-  val maxVolume = host.audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+  val maxVolume = 100
 
   val subtitleTracks: StateFlow<List<TrackNode>> =
     MPVLib.propNode["track-list"]
@@ -1016,25 +1018,21 @@ class PlayerViewModel(
   }
 
   fun changeVolumeBy(change: Int) {
-    val mpvVolume = MPVLib.getPropertyInt("volume")
-    val absoluteMaxVolume = volumeBoostCap ?: (audioPreferences.volumeBoostCap.get() + 100)
-
-    if (absoluteMaxVolume > 100 && currentVolume.value == maxVolume) {
-      if (mpvVolume == 100 && change < 0) {
-        changeVolumeTo(currentVolume.value + change)
-      }
-      val finalMPVVolume = (mpvVolume?.plus(change))?.coerceAtLeast(100) ?: 100
-      if (finalMPVVolume in 100..absoluteMaxVolume) {
-        return changeMPVVolumeTo(finalMPVVolume)
-      }
-    }
-    changeVolumeTo(currentVolume.value + change)
+    val currentIdx = volumeStops.indexOf(currentVolume.value)
+      .takeIf { it >= 0 }
+      ?: volumeStops.indexOfFirst { it >= currentVolume.value }.coerceAtLeast(0)
+    val newIdx = (currentIdx + change).coerceIn(0, volumeStops.lastIndex)
+    changeVolumeTo(volumeStops[newIdx])
   }
 
   fun changeVolumeTo(volume: Int) {
-    val newVolume = volume.coerceIn(0..maxVolume)
-    host.audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
-    currentVolume.value = newVolume
+    val target = volumeStops.minByOrNull { kotlin.math.abs(it - volume) } ?: 0
+    val systemMax = host.audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+    if (host.audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) < systemMax) {
+      host.audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, systemMax, 0)
+    }
+    MPVLib.setPropertyInt("volume", target)
+    currentVolume.value = target
   }
 
   fun changeMPVVolumeTo(volume: Int) {

@@ -36,8 +36,12 @@ import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.FitScreen
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.RepeatOn
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.ScreenRotation
@@ -536,14 +540,14 @@ fun RenderPlayerButton(
         icon =
           when (aspect) {
             VideoAspect.Fit -> Icons.Default.AspectRatio
-            VideoAspect.Stretch -> Icons.Default.ZoomOutMap
             VideoAspect.Crop -> Icons.Default.FitScreen
+            VideoAspect.Stretch -> Icons.Default.AspectRatio
           },
         onClick = {
           when (aspect) {
-            VideoAspect.Fit -> viewModel.changeVideoAspect(VideoAspect.Stretch)
-            VideoAspect.Stretch -> viewModel.changeVideoAspect(VideoAspect.Crop)
+            VideoAspect.Fit -> viewModel.changeVideoAspect(VideoAspect.Crop)
             VideoAspect.Crop -> viewModel.changeVideoAspect(VideoAspect.Fit)
+            VideoAspect.Stretch -> viewModel.changeVideoAspect(VideoAspect.Fit)
           }
         },
         onLongClick = { onOpenSheet(Sheets.AspectRatios) },
@@ -839,6 +843,50 @@ fun RenderPlayerButton(
         icon = Icons.Default.Headset,
         onClick = { activity.triggerBackgroundPlayback() },
         color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.size(buttonSize),
+      )
+    }
+
+    PlayerButton.PREVIOUS -> {
+      val hasPlaylist = viewModel.hasPlaylistSupport()
+      val canGoPrev = hasPlaylist && viewModel.hasPrevious()
+      ControlsButton(
+        icon = Icons.Default.SkipPrevious,
+        onClick = {
+          if (canGoPrev) viewModel.playPrevious()
+        },
+        color = if (canGoPrev) {
+          if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface
+        } else {
+          (if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface).copy(alpha = 0.38f)
+        },
+        modifier = Modifier.size(buttonSize),
+      )
+    }
+
+    PlayerButton.PLAY_PAUSE -> {
+      val paused by `is`.xyz.mpv.MPVLib.propBoolean["pause"].collectAsState()
+      ControlsButton(
+        icon = if (paused == false) Icons.Default.Pause else Icons.Default.PlayArrow,
+        onClick = { viewModel.pauseUnpause() },
+        color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.size(buttonSize),
+      )
+    }
+
+    PlayerButton.NEXT -> {
+      val hasPlaylist = viewModel.hasPlaylistSupport()
+      val canGoNext = hasPlaylist && viewModel.hasNext()
+      ControlsButton(
+        icon = Icons.Default.SkipNext,
+        onClick = {
+          if (canGoNext) viewModel.playNext()
+        },
+        color = if (canGoNext) {
+          if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface
+        } else {
+          (if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface).copy(alpha = 0.38f)
+        },
         modifier = Modifier.size(buttonSize),
       )
     }

@@ -32,6 +32,19 @@ the [Issues](https://github.com/marlboro-advance/mpvEx/issues) section.**
 
 ---
 
+## Personal fork modifications (`ui_modified` branch)
+
+This fork carries a small stack of UX tweaks on top of upstream mpvExtended:
+
+- **Toolbar transport controls.** Previous / Play-Pause / Next icons are exposed as `PlayerButton` entries and shown on the left side of the bottom toolbar; the redundant large center prev/play/next cluster is removed. The capture, repeat, and Picture-in-Picture icons are dropped from the default toolbar layouts.
+- **Aspect-ratio toggle.** The toolbar's aspect-ratio button now cycles only between **Fit** and **Crop** (Stretch is no longer reachable from the toggle).
+- **Cleaner overlay.** The lock-controls and screen-rotation icons are removed from the default toolbar, and the dark vertical-gradient scrim that used to sit behind the toolbar/header is removed so controls render directly over the video.
+- **Tighter seekbar.** Position/duration labels use `labelSmall` + monospace at 64 dp, and the row's arrangement spacing is zero — the labels butt against the seekbar so it gets more horizontal room.
+- **Smarter thumbnails.** For local files, videos shorter than 120 s use the first frame; longer videos sample at 120 s to skip past the typical intro/ads. The disk cache key is suffixed with the frame position so previously generated thumbnails get regenerated automatically.
+- **Snap-list volume gesture.** The vertical volume swipe drives mpv's `volume` property snapped to a fixed stop list `[0, 2, 4, 6, 8, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]` — fine 2 % steps at low levels, coarse 10 % steps at high levels. Android's `STREAM_MUSIC` is held at the hardware max so it can't silently attenuate, and hardware `VOL ±` keys walk the stop list.
+
+---
+
 ## Installation
 
 ### Stable Release

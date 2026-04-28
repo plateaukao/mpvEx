@@ -282,16 +282,7 @@ fun PlayerControls(
       ConstraintLayout(
         modifier =
           modifier
-            .fillMaxSize()
-            .background(
-              Brush.verticalGradient(
-                Pair(0f, Color.Black),
-                Pair(.4f, Color.Transparent),
-                Pair(.6f, Color.Transparent),
-                Pair(1f, Color.Black),
-              ),
-              alpha = transparentOverlay,
-            ),
+            .fillMaxSize(),
       ) {
         val (topLeftControls, topRightControls) = createRefs()
         val (volumeSlider, brightnessSlider) = createRefs()

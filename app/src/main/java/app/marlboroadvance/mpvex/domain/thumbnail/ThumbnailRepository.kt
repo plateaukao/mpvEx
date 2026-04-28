@@ -265,7 +265,7 @@ class ThumbnailRepository(
     return if (isNetworkUrl(video.path)) {
       "$baseKey|disk|d$diskCacheDimension|pos3"
     } else {
-      "$baseKey|disk|d$diskCacheDimension"
+      "$baseKey|disk|d$diskCacheDimension|pos120"
     }
   }
 
@@ -444,12 +444,10 @@ class ThumbnailRepository(
     }
     
     val durationSec = video.duration / 1000.0
-    
-    if (durationSec <= 0.0 || durationSec < 20.0) return 0.0
-    
-    val candidate = 3.0
-    
-    return candidate.coerceIn(0.0, max(0.0, durationSec - 0.1))
+
+    if (durationSec <= 0.0 || durationSec < 120.0) return 0.0
+
+    return 120.0.coerceIn(0.0, max(0.0, durationSec - 0.1))
   }
   
   private fun isNetworkUrl(path: String): Boolean {

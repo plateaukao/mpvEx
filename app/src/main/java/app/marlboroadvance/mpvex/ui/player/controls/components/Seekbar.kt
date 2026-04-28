@@ -109,7 +109,7 @@ fun SeekbarWithTimers(
   Row(
     modifier = modifier.height(48.dp),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.extraSmall),
+    horizontalArrangement = Arrangement.spacedBy(0.dp),
   ) {
     VideoTimer(
       value = if (isUserInteracting) userPosition else position,
@@ -118,7 +118,7 @@ fun SeekbarWithTimers(
         clickEvent()
         positionTimerOnClick()
       },
-      modifier = Modifier.width(92.dp),
+      modifier = Modifier.width(64.dp),
     )
 
     // Seekbar with expanded touch area
@@ -260,7 +260,7 @@ fun SeekbarWithTimers(
         clickEvent()
         durationTimerOnCLick()
       },
-      modifier = Modifier.width(92.dp),
+      modifier = Modifier.width(64.dp),
     )
   }
 }
@@ -533,6 +533,8 @@ fun VideoTimer(
     text = Utils.prettyTime(value.toInt(), isInverted),
     color = Color.White,
     textAlign = TextAlign.Center,
+    style = MaterialTheme.typography.labelSmall,
+    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
   )
 }
 

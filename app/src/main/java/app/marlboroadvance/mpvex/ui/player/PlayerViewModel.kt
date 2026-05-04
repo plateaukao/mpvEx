@@ -3,7 +3,6 @@ package app.marlboroadvance.mpvex.ui.player
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.media.AudioManager
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.provider.Settings
@@ -162,7 +161,9 @@ class PlayerViewModel(
   // Audio state
   // Snap-list volume: low end is fine (steps of 2), high end coarse (steps of 10).
   private val volumeStops = listOf(0, 2, 4, 6, 8, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100)
-  val currentVolume = MutableStateFlow(50)
+  val currentVolume = MutableStateFlow(
+    volumeStops.minByOrNull { kotlin.math.abs(it - audioPreferences.lastVolume.get()) } ?: 50,
+  )
   private val volumeBoostCap by MPVLib.propInt["volume-max"].collectAsState(viewModelScope)
 
   init {
@@ -1027,12 +1028,9 @@ class PlayerViewModel(
 
   fun changeVolumeTo(volume: Int) {
     val target = volumeStops.minByOrNull { kotlin.math.abs(it - volume) } ?: 0
-    val systemMax = host.audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-    if (host.audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) < systemMax) {
-      host.audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, systemMax, 0)
-    }
     MPVLib.setPropertyInt("volume", target)
     currentVolume.value = target
+    audioPreferences.lastVolume.set(target)
   }
 
   fun changeMPVVolumeTo(volume: Int) {

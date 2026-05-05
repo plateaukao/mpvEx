@@ -45,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
+import app.marlboroadvance.mpvex.preferences.BottomLeftControlsLayout
 import app.marlboroadvance.mpvex.preferences.PlayerButton
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
 import app.marlboroadvance.mpvex.preferences.SeekbarStyle
@@ -162,6 +163,44 @@ object PlayerControlsPreferencesScreen : Screen {
                 },
               )
               PreferenceIconSummary(buttons = bottomLeftButtons)
+
+              PreferenceDivider()
+
+              val bottomLeftLayout by appearancePrefs.bottomLeftControlsLayout.collectAsState()
+              Text(
+                text = stringResource(id = R.string.pref_layout_bottom_left_orientation),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
+              )
+              BottomLeftControlsLayout.entries.forEachIndexed { index, layout ->
+                val labelRes = when (layout) {
+                  BottomLeftControlsLayout.Horizontal ->
+                    R.string.pref_layout_bottom_left_orientation_horizontal
+                  BottomLeftControlsLayout.VerticalLeft ->
+                    R.string.pref_layout_bottom_left_orientation_vertical_left
+                  BottomLeftControlsLayout.VerticalRight ->
+                    R.string.pref_layout_bottom_left_orientation_vertical_right
+                }
+                ListItem(
+                  headlineContent = { Text(text = stringResource(id = labelRes)) },
+                  trailingContent = {
+                    RadioButton(
+                      selected = bottomLeftLayout == layout,
+                      onClick = null,
+                    )
+                  },
+                  colors = androidx.compose.material3.ListItemDefaults.colors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                  ),
+                  modifier = Modifier.clickable {
+                    appearancePrefs.bottomLeftControlsLayout.set(layout)
+                  },
+                )
+                if (index < BottomLeftControlsLayout.entries.size - 1) {
+                  PreferenceDivider()
+                }
+              }
             }
           }
           

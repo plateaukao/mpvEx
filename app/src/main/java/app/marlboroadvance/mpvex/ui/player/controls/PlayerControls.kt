@@ -92,6 +92,7 @@ import androidx.constraintlayout.compose.Dimension
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
+import app.marlboroadvance.mpvex.preferences.BottomLeftControlsLayout
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.preferences.preference.deleteAndGet
@@ -217,6 +218,7 @@ fun PlayerControls(
   val bottomRightControlsPref by appearancePreferences.bottomRightControls.collectAsState()
   val bottomLeftControlsPref by appearancePreferences.bottomLeftControls.collectAsState()
   val portraitBottomControlsPref by appearancePreferences.portraitBottomControls.collectAsState()
+  val bottomLeftControlsLayout by appearancePreferences.bottomLeftControlsLayout.collectAsState()
 
   val (topRightButtons, bottomRightButtons, bottomLeftButtons) =
     remember(
@@ -836,7 +838,11 @@ fun PlayerControls(
                   width = Dimension.fillToConstraints
                 } else {
                   bottom.linkTo(seekbar.top, spacing.small)
-                  end.linkTo(parent.end, spacing.large)
+                  if (bottomLeftControlsLayout == BottomLeftControlsLayout.VerticalRight) {
+                    end.linkTo(bottomLeftControls.start, spacing.small)
+                  } else {
+                    end.linkTo(parent.end, spacing.large)
+                  }
                 }
               },
         ) {
@@ -879,18 +885,27 @@ fun PlayerControls(
           }
         }
 
+        val isBottomLeftVertical = !isPortrait &&
+          bottomLeftControlsLayout != BottomLeftControlsLayout.Horizontal
+        val slideFromLeft =
+          isPortrait || bottomLeftControlsLayout != BottomLeftControlsLayout.VerticalRight
+
         AnimatedVisibility(
           visible = controlsShown && !areControlsLocked && !isPortrait && !areSlidersShown,
           enter =
             if (!reduceMotion) {
-              slideInHorizontally(playerControlsEnterAnimationSpec()) { -it } +
+              slideInHorizontally(playerControlsEnterAnimationSpec()) {
+                if (slideFromLeft) -it else it
+              } +
                 fadeIn(playerControlsEnterAnimationSpec())
             } else {
               fadeIn(playerControlsEnterAnimationSpec())
             },
           exit =
             if (!reduceMotion) {
-              slideOutHorizontally(playerControlsExitAnimationSpec()) { -it } +
+              slideOutHorizontally(playerControlsExitAnimationSpec()) {
+                if (slideFromLeft) -it else it
+              } +
                 fadeOut(playerControlsExitAnimationSpec())
             } else {
               fadeOut(playerControlsExitAnimationSpec())
@@ -909,10 +924,22 @@ fun PlayerControls(
                 }
               )
               .constrainAs(bottomLeftControls) {
-                bottom.linkTo(seekbar.top, spacing.small)
-                start.linkTo(parent.start, spacing.large)
-                width = Dimension.fillToConstraints
-                end.linkTo(bottomRightControls.start, spacing.small)
+                when {
+                  isBottomLeftVertical && bottomLeftControlsLayout == BottomLeftControlsLayout.VerticalLeft -> {
+                    bottom.linkTo(seekbar.top, spacing.small)
+                    start.linkTo(parent.start, spacing.large)
+                  }
+                  isBottomLeftVertical && bottomLeftControlsLayout == BottomLeftControlsLayout.VerticalRight -> {
+                    bottom.linkTo(seekbar.top, spacing.small)
+                    end.linkTo(parent.end, spacing.large)
+                  }
+                  else -> {
+                    bottom.linkTo(seekbar.top, spacing.small)
+                    start.linkTo(parent.start, spacing.large)
+                    width = Dimension.fillToConstraints
+                    end.linkTo(bottomRightControls.start, spacing.small)
+                  }
+                }
               },
         ) {
           BottomLeftPlayerControlsLandscape(
@@ -931,6 +958,7 @@ fun PlayerControls(
             onOpenPanel = onOpenPanel,
             viewModel = viewModel,
             activity = activity,
+            vertical = isBottomLeftVertical,
           )
         }
 

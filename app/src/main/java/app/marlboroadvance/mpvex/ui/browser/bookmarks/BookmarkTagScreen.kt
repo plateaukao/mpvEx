@@ -1,10 +1,14 @@
 package app.marlboroadvance.mpvex.ui.browser.bookmarks
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
@@ -22,10 +26,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.database.entities.BookmarkEntity
 import app.marlboroadvance.mpvex.database.repository.BookmarkRepository
+import app.marlboroadvance.mpvex.preferences.BrowserPreferences
+import app.marlboroadvance.mpvex.preferences.MediaLayoutMode
+import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.ConfirmDialog
 import app.marlboroadvance.mpvex.ui.browser.cards.BookmarkCard
@@ -33,12 +41,14 @@ import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
+import app.marlboroadvance.mpvex.utils.sort.SortUtils
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
 /**
  * Lists the bookmarks belonging to a tag (or All / Untagged) and plays them as a queue.
+ * Supports list/grid layout and sorting, mirroring the Home browser.
  *
  * @param tagId the tag to show; null means all or untagged depending on [untaggedOnly]
  * @param untaggedOnly when true (and tagId is null), shows only bookmarks with no tag
@@ -56,6 +66,7 @@ data class BookmarkTagScreen(
     val context = LocalContext.current
     val backStack = LocalBackStack.current
     val repository = koinInject<BookmarkRepository>()
+    val browserPreferences = koinInject<BrowserPreferences>()
     val scope = rememberCoroutineScope()
 
     val bookmarksFlow = remember(tagId, untaggedOnly) {
@@ -65,13 +76,28 @@ data class BookmarkTagScreen(
         else -> repository.observeAllBookmarks()
       }
     }
-    val bookmarks by bookmarksFlow.collectAsState(initial = emptyList())
+    val rawBookmarks by bookmarksFlow.collectAsState(initial = emptyList())
 
     // Tag name lookup for the "All" view (where bookmarks may have different tags).
     val tags by remember { repository.observeAllTags() }.collectAsState(initial = emptyList())
     val tagNames = remember(tags) { tags.associate { it.id to it.name } }
 
+    // Layout + sorting (shared media layout prefs; bookmark-specific sort prefs).
+    val mediaLayoutMode by browserPreferences.mediaLayoutMode.collectAsState()
+    val sortType by browserPreferences.bookmarkSortType.collectAsState()
+    val sortOrder by browserPreferences.bookmarkSortOrder.collectAsState()
+    val videoGridColumnsPortrait by browserPreferences.videoGridColumnsPortrait.collectAsState()
+    val videoGridColumnsLandscape by browserPreferences.videoGridColumnsLandscape.collectAsState()
+    val isLandscape = LocalConfiguration.current.orientation ==
+      android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val gridColumns = if (isLandscape) videoGridColumnsLandscape else videoGridColumnsPortrait
+
+    val bookmarks = remember(rawBookmarks, sortType, sortOrder) {
+      SortUtils.sortBookmarks(rawBookmarks, sortType, sortOrder)
+    }
+
     var pendingDelete by remember { mutableStateOf<BookmarkEntity?>(null) }
+    var sortDialogOpen by remember { mutableStateOf(false) }
 
     Scaffold(
       topBar = {
@@ -82,6 +108,7 @@ data class BookmarkTagScreen(
           totalCount = bookmarks.size,
           onCancelSelection = {},
           onBackClick = { backStack.removeLastOrNull() },
+          onSortClick = { sortDialogOpen = true },
           additionalActions = {
             if (bookmarks.isNotEmpty()) {
               IconButton(onClick = { MediaUtils.playBookmarks(bookmarks, 0, context) }) {
@@ -106,27 +133,57 @@ data class BookmarkTagScreen(
           )
         }
       } else {
-        LazyColumn(
-          modifier = Modifier
-            .fillMaxSize()
-            .padding(padding),
-          contentPadding = PaddingValues(vertical = 8.dp),
-        ) {
-          items(bookmarks, key = { it.id }) { bookmark ->
-            BookmarkCard(
-              bookmark = bookmark,
-              tagName = bookmark.tagId?.let { tagNames[it] },
-              isSelected = false,
-              onClick = {
-                val index = bookmarks.indexOfFirst { it.id == bookmark.id }.coerceAtLeast(0)
-                MediaUtils.playBookmarks(bookmarks, index, context)
-              },
-              onLongClick = { pendingDelete = bookmark },
-            )
+        val onBookmarkClick: (BookmarkEntity) -> Unit = { bookmark ->
+          val index = bookmarks.indexOfFirst { it.id == bookmark.id }.coerceAtLeast(0)
+          MediaUtils.playBookmarks(bookmarks, index, context)
+        }
+
+        if (mediaLayoutMode == MediaLayoutMode.GRID) {
+          LazyVerticalGrid(
+            columns = GridCells.Fixed(gridColumns),
+            modifier = Modifier
+              .fillMaxSize()
+              .padding(padding),
+            contentPadding = PaddingValues(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            gridItems(bookmarks, key = { it.id }) { bookmark ->
+              BookmarkCard(
+                bookmark = bookmark,
+                tagName = bookmark.tagId?.let { tagNames[it] },
+                isSelected = false,
+                onClick = { onBookmarkClick(bookmark) },
+                onLongClick = { pendingDelete = bookmark },
+                isGridMode = true,
+              )
+            }
+          }
+        } else {
+          LazyColumn(
+            modifier = Modifier
+              .fillMaxSize()
+              .padding(padding),
+            contentPadding = PaddingValues(vertical = 8.dp),
+          ) {
+            items(bookmarks, key = { it.id }) { bookmark ->
+              BookmarkCard(
+                bookmark = bookmark,
+                tagName = bookmark.tagId?.let { tagNames[it] },
+                isSelected = false,
+                onClick = { onBookmarkClick(bookmark) },
+                onLongClick = { pendingDelete = bookmark },
+              )
+            }
           }
         }
       }
     }
+
+    BookmarkSortDialog(
+      isOpen = sortDialogOpen,
+      onDismiss = { sortDialogOpen = false },
+    )
 
     pendingDelete?.let { bookmark ->
       ConfirmDialog(

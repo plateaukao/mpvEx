@@ -1,13 +1,32 @@
 package app.marlboroadvance.mpvex.utils.sort
 
+import app.marlboroadvance.mpvex.database.entities.BookmarkEntity
 import app.marlboroadvance.mpvex.domain.browser.FileSystemItem
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
+import app.marlboroadvance.mpvex.preferences.BookmarkSortType
 import app.marlboroadvance.mpvex.preferences.FolderSortType
 import app.marlboroadvance.mpvex.preferences.SortOrder
 import app.marlboroadvance.mpvex.preferences.VideoSortType
 
 object SortUtils {
+  /**
+   * Sort bookmarks by the specified type and order
+   */
+  fun sortBookmarks(
+    bookmarks: List<BookmarkEntity>,
+    sortType: BookmarkSortType,
+    sortOrder: SortOrder,
+  ): List<BookmarkEntity> {
+    val sorted =
+      when (sortType) {
+        BookmarkSortType.DateAdded -> bookmarks.sortedBy { it.createdAt }
+        BookmarkSortType.Timestamp -> bookmarks.sortedBy { it.positionMs }
+        BookmarkSortType.Title -> bookmarks.sortedWith { a, b -> NaturalOrderComparator.DEFAULT.compare(a.fileName, b.fileName) }
+      }
+    return if (sortOrder.isAscending) sorted else sorted.reversed()
+  }
+
   /**
    * Sort videos by the specified type and order
    */

@@ -45,7 +45,8 @@ import `is`.xyz.mpv.Utils
 import java.io.File
 
 /**
- * A single bookmark row: frame thumbnail, video name, timestamp, optional tag chip.
+ * A single bookmark: frame thumbnail, video name, timestamp, optional tag chip.
+ * Renders as a horizontal row in list mode and as a vertical tile in grid mode.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -56,6 +57,7 @@ fun BookmarkCard(
   onClick: () -> Unit,
   onLongClick: () -> Unit,
   modifier: Modifier = Modifier,
+  isGridMode: Boolean = false,
 ) {
   var thumbnail by remember(bookmark.id, bookmark.thumbnailPath) { mutableStateOf<ImageBitmap?>(null) }
   LaunchedEffect(bookmark.thumbnailPath) {
@@ -72,92 +74,145 @@ fun BookmarkCard(
     }
   }
 
-  Card(
-    modifier = modifier
-      .fillMaxWidth()
-      .padding(horizontal = MaterialTheme.spacing.smaller, vertical = 4.dp)
-      .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-    colors = CardDefaults.cardColors(
-      containerColor = if (isSelected) {
-        MaterialTheme.colorScheme.secondaryContainer
-      } else {
-        MaterialTheme.colorScheme.surfaceContainer
-      },
-    ),
-    shape = RoundedCornerShape(12.dp),
-  ) {
-    Row(
-      modifier = Modifier.padding(MaterialTheme.spacing.smaller),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Box(
-        modifier = Modifier
-          .width(120.dp)
-          .aspectRatio(16f / 9f)
-          .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
-        contentAlignment = Alignment.Center,
-      ) {
-        val thumb = thumbnail
-        if (thumb != null) {
-          Image(
-            bitmap = thumb,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)),
-          )
-        } else {
-          Icon(
-            imageVector = Icons.Filled.Bookmark,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(28.dp),
-          )
-        }
-      }
+  val containerColor = if (isSelected) {
+    MaterialTheme.colorScheme.secondaryContainer
+  } else {
+    MaterialTheme.colorScheme.surfaceContainer
+  }
 
-      Column(
-        modifier = Modifier
-          .weight(1f)
-          .padding(start = MaterialTheme.spacing.small),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-      ) {
-        Text(
-          text = bookmark.fileName,
-          style = MaterialTheme.typography.bodyMedium,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
-          color = MaterialTheme.colorScheme.onSurface,
+  if (isGridMode) {
+    Card(
+      modifier = modifier
+        .fillMaxWidth()
+        .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+      colors = CardDefaults.cardColors(containerColor = containerColor),
+      shape = RoundedCornerShape(12.dp),
+    ) {
+      Column {
+        Thumbnail(
+          thumbnail = thumbnail,
+          modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f),
+          cornerRadius = 0.dp,
         )
-        Text(
-          text = Utils.prettyTime((bookmark.positionMs / 1000).toInt()),
-          style = MaterialTheme.typography.labelMedium,
-          color = MaterialTheme.colorScheme.primary,
-        )
-        if (!bookmark.note.isNullOrBlank()) {
-          Text(
-            text = bookmark.note,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
-        if (tagName != null) {
-          Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(
-              imageVector = Icons.Filled.Sell,
-              contentDescription = null,
-              tint = MaterialTheme.colorScheme.onSurfaceVariant,
-              modifier = Modifier.size(14.dp),
-            )
-            Text(
-              text = tagName,
-              style = MaterialTheme.typography.labelSmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          }
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(MaterialTheme.spacing.smaller),
+          verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+          BookmarkTexts(bookmark = bookmark, tagName = tagName, titleMaxLines = 2)
         }
       }
+    }
+  } else {
+    Card(
+      modifier = modifier
+        .fillMaxWidth()
+        .padding(horizontal = MaterialTheme.spacing.smaller, vertical = 4.dp)
+        .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+      colors = CardDefaults.cardColors(containerColor = containerColor),
+      shape = RoundedCornerShape(12.dp),
+    ) {
+      Row(
+        modifier = Modifier.padding(MaterialTheme.spacing.smaller),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Thumbnail(
+          thumbnail = thumbnail,
+          modifier = Modifier
+            .width(120.dp)
+            .aspectRatio(16f / 9f),
+          cornerRadius = 8.dp,
+        )
+        Column(
+          modifier = Modifier
+            .weight(1f)
+            .padding(start = MaterialTheme.spacing.small),
+          verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+          BookmarkTexts(bookmark = bookmark, tagName = tagName, titleMaxLines = 2)
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun Thumbnail(
+  thumbnail: ImageBitmap?,
+  modifier: Modifier = Modifier,
+  cornerRadius: androidx.compose.ui.unit.Dp = 0.dp,
+) {
+  val shape = RoundedCornerShape(cornerRadius)
+  Box(
+    modifier = modifier
+      .clip(shape)
+      .background(MaterialTheme.colorScheme.surfaceVariant),
+    contentAlignment = Alignment.Center,
+  ) {
+    val thumb = thumbnail
+    if (thumb != null) {
+      Image(
+        bitmap = thumb,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+      )
+    } else {
+      Icon(
+        imageVector = Icons.Filled.Bookmark,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.size(28.dp),
+      )
+    }
+  }
+}
+
+@Composable
+private fun BookmarkTexts(
+  bookmark: BookmarkEntity,
+  tagName: String?,
+  titleMaxLines: Int,
+) {
+  Text(
+    text = bookmark.fileName,
+    style = MaterialTheme.typography.bodyMedium,
+    maxLines = titleMaxLines,
+    overflow = TextOverflow.Ellipsis,
+    color = MaterialTheme.colorScheme.onSurface,
+  )
+  Text(
+    text = Utils.prettyTime((bookmark.positionMs / 1000).toInt()),
+    style = MaterialTheme.typography.labelMedium,
+    color = MaterialTheme.colorScheme.primary,
+  )
+  if (!bookmark.note.isNullOrBlank()) {
+    Text(
+      text = bookmark.note,
+      style = MaterialTheme.typography.bodySmall,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  }
+  if (tagName != null) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+      Icon(
+        imageVector = Icons.Filled.Sell,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.size(14.dp),
+      )
+      Text(
+        text = tagName,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
     }
   }
 }

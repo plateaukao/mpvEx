@@ -18,6 +18,10 @@ class BrowserPreferences(
   val videoSortType = preferenceStore.getEnum("video_sort_type", VideoSortType.Title)
   val videoSortOrder = preferenceStore.getEnum("video_sort_order", SortOrder.Ascending)
 
+  // Bookmark sorting preferences
+  val bookmarkSortType = preferenceStore.getEnum("bookmark_sort_type", BookmarkSortType.DateAdded)
+  val bookmarkSortOrder = preferenceStore.getEnum("bookmark_sort_order", SortOrder.Descending)
+
   val folderViewMode = preferenceStore.getEnum("folder_view_mode", FolderViewMode.AlbumView)
 
   private val isTablet = context.resources.configuration.smallestScreenWidthDp >= 600
@@ -101,6 +105,24 @@ enum class VideoSortType {
         Duration -> "Duration"
         Date -> "Date"
         Size -> "Size"
+      }
+}
+
+/**
+ * Bookmark sorting options
+ */
+enum class BookmarkSortType {
+  DateAdded,
+  Timestamp,
+  Title,
+  ;
+
+  val displayName: String
+    get() =
+      when (this) {
+        DateAdded -> "Date Added"
+        Timestamp -> "Timestamp"
+        Title -> "Title"
       }
 }
 

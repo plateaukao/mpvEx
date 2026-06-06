@@ -1693,13 +1693,21 @@ class PlayerActivity :
       withContext(Dispatchers.Main) {
         val savedAspect = playerPreferences.defaultVideoAspect.get()
         val savedCustomRatio = playerPreferences.defaultCustomAspectRatio.get()
-        
+
         if (savedCustomRatio > 0) {
           // Apply custom aspect ratio
           viewModel.setCustomAspectRatio(savedCustomRatio)
         } else {
           // Apply standard aspect mode (Fit, Crop, or Stretch)
           viewModel.changeVideoAspect(savedAspect, showUpdate = false)
+        }
+      }
+
+      // Bookmark playback: seek this item to its bookmarked time. Done last so it overrides
+      // both the intent "position" extra and any restored resume position (loadVideoPlaybackState).
+      playlistPositions.getOrNull(playlistIndex)?.takeIf { it >= 0 }?.let { bookmarkPosMs ->
+        withContext(Dispatchers.Main) {
+          MPVLib.setPropertyInt("time-pos", (bookmarkPosMs / MILLISECONDS_TO_SECONDS).toInt())
         }
       }
     }
@@ -3042,13 +3050,9 @@ class PlayerActivity :
 
     // Load the new video
     // Avoid blocking UI thread while mpv opens network streams (e.g., HLS).
+    // The per-item bookmark seek is applied in handleFileLoaded() once the file is ready.
     lifecycleScope.launch(Dispatchers.Default) {
       MPVLib.command("loadfile", playableUri)
-      // For bookmark playback: seek the freshly loaded item to its bookmarked time.
-      // mpv applies a time-pos set right after loadfile as the start position.
-      playlistPositions.getOrNull(index)?.takeIf { it >= 0 }?.let { posMs ->
-        MPVLib.setPropertyInt("time-pos", (posMs / MILLISECONDS_TO_SECONDS).toInt())
-      }
     }
 
     // Update media title (this will trigger UI update)

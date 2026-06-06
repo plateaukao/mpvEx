@@ -47,7 +47,7 @@ class AppearancePreferences(
   val bottomRightControls =
     preferenceStore.getString(
       "bottom_right_controls",
-      "VIDEO_ZOOM,ASPECT_RATIO",
+      "ADD_BOOKMARK,VIDEO_ZOOM,ASPECT_RATIO",
     )
 
   val bottomLeftControls =
@@ -59,7 +59,7 @@ class AppearancePreferences(
   val portraitBottomControls =
     preferenceStore.getString(
       "portrait_bottom_controls",
-      "PREVIOUS,PLAY_PAUSE,NEXT,DECODER,AUDIO_TRACK,SUBTITLES,BOOKMARKS_CHAPTERS,PLAYBACK_SPEED,SHUFFLE,VIDEO_ZOOM,ASPECT_RATIO,MORE_OPTIONS",
+      "PREVIOUS,PLAY_PAUSE,NEXT,DECODER,AUDIO_TRACK,SUBTITLES,BOOKMARKS_CHAPTERS,ADD_BOOKMARK,PLAYBACK_SPEED,SHUFFLE,VIDEO_ZOOM,ASPECT_RATIO,MORE_OPTIONS",
     )
 
   fun parseButtons(

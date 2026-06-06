@@ -181,6 +181,13 @@ class PlayerActivity :
   internal var playlistIndex: Int = 0
 
   /**
+   * Optional per-item start positions (milliseconds), parallel to [playlist].
+   * Used for bookmark playback so each loaded item seeks to its bookmarked time.
+   * A value < 0 (or a missing index) means "play from the start".
+   */
+  internal var playlistPositions: LongArray = LongArray(0)
+
+  /**
    * Shuffled order of playlist indices (when shuffle is enabled)
    */
   private var shuffledIndices: List<Int> = emptyList()
@@ -352,6 +359,9 @@ class PlayerActivity :
       @Suppress("DEPRECATION")
       intent.getParcelableArrayListExtra("playlist") ?: emptyList()
     }
+
+    // Optional per-item start positions (bookmark playback)
+    playlistPositions = intent.getLongArrayExtra("playlist_positions") ?: LongArray(0)
 
     // If playlist is empty but playlist_id is provided, load asynchronously from database
     // Load all items - LazyColumn handles pagination/virtualization efficiently
@@ -2284,6 +2294,7 @@ class PlayerActivity :
       playlistWindowOffset = 0
       playlistTotalCount = -1
       playlist = playlistFromIntent
+      playlistPositions = intent.getLongArrayExtra("playlist_positions") ?: LongArray(0)
     }
 
     // If playlist is empty but playlist_id is provided, load from database
@@ -3033,6 +3044,11 @@ class PlayerActivity :
     // Avoid blocking UI thread while mpv opens network streams (e.g., HLS).
     lifecycleScope.launch(Dispatchers.Default) {
       MPVLib.command("loadfile", playableUri)
+      // For bookmark playback: seek the freshly loaded item to its bookmarked time.
+      // mpv applies a time-pos set right after loadfile as the start position.
+      playlistPositions.getOrNull(index)?.takeIf { it >= 0 }?.let { posMs ->
+        MPVLib.setPropertyInt("time-pos", (posMs / MILLISECONDS_TO_SECONDS).toInt())
+      }
     }
 
     // Update media title (this will trigger UI update)
@@ -3240,6 +3256,33 @@ class PlayerActivity :
     } else {
       fileName
     }
+  }
+
+  /**
+   * Snapshot of everything needed to record a bookmark for the currently playing video.
+   * Returns null if no playable URI can be resolved.
+   */
+  data class BookmarkContext(
+    val videoUri: String,
+    val videoPath: String,
+    val fileName: String,
+    val mediaIdentifier: String,
+    val durationMs: Long,
+  )
+
+  fun currentBookmarkContext(): BookmarkContext? {
+    val uri = playlist.getOrNull(playlistIndex) ?: extractUriFromIntent(intent) ?: return null
+    val name = fileName.ifBlank { getFileNameFromUri(uri) }
+    val path = if (uri.scheme == "file") uri.path ?: uri.toString() else uri.toString()
+    val identifier = mediaIdentifier.ifBlank { getMediaIdentifierFromUri(uri, name) }
+    val durationMs = (MPVLib.getPropertyInt("duration") ?: 0).toLong() * 1000L
+    return BookmarkContext(
+      videoUri = uri.toString(),
+      videoPath = path,
+      fileName = name,
+      mediaIdentifier = identifier,
+      durationMs = durationMs,
+    )
   }
 
   private fun generatePlaylistFromFolder(currentPath: String) {

@@ -89,6 +89,7 @@ class PlayerViewModel(
   private val advancedPreferences: AdvancedPreferences by inject()
   private val json: Json by inject()
   private val playbackStateDao: app.marlboroadvance.mpvex.database.dao.PlaybackStateDao by inject()
+  private val bookmarkRepository: app.marlboroadvance.mpvex.database.repository.BookmarkRepository by inject()
   private val wyzieRepository: WyzieSearchRepository by inject()
 
   // Playlist items for the playlist sheet
@@ -1412,6 +1413,113 @@ class PlayerViewModel(
       }
     }
   }
+
+  // ==================== Bookmarks ====================
+
+  val tagsWithCounts =
+    bookmarkRepository
+      .observeTagsWithCounts()
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+  // Position + thumbnail frozen at the moment the "Add bookmark" button is pressed, so the
+  // bookmark reflects that instant rather than whenever the user finishes tagging/saving.
+  private val _pendingBookmarkPositionMs = MutableStateFlow<Long?>(null)
+  val pendingBookmarkPositionMs: StateFlow<Long?> = _pendingBookmarkPositionMs.asStateFlow()
+  private var pendingBookmarkThumb: File? = null
+  private var pendingThumbJob: Job? = null
+
+  /**
+   * Freeze the bookmark moment: capture the current precise position and a thumbnail of the
+   * current frame. Called when the "Add bookmark" button is pressed, before the tag sheet opens.
+   */
+  fun prepareBookmark(context: Context) {
+    val posMs = ((MPVLib.getPropertyDouble("time-pos") ?: 0.0) * 1000).toLong().coerceAtLeast(0L)
+    _pendingBookmarkPositionMs.value = posMs
+    pendingBookmarkThumb?.let { runCatching { it.delete() } }
+    pendingBookmarkThumb = null
+    pendingThumbJob = viewModelScope.launch(Dispatchers.IO) {
+      runCatching {
+        val tmp = File(context.cacheDir, "bm_pending.jpg")
+        MPVLib.command("screenshot-to-file", tmp.absolutePath, "video")
+        delay(200)
+        if (tmp.exists() && tmp.length() > 0) pendingBookmarkThumb = tmp
+      }
+    }
+  }
+
+  /** Discard a frozen bookmark moment (sheet dismissed without saving). */
+  fun discardPendingBookmark() {
+    _pendingBookmarkPositionMs.value = null
+    pendingThumbJob?.cancel()
+    pendingBookmarkThumb?.let { runCatching { it.delete() } }
+    pendingBookmarkThumb = null
+  }
+
+  /**
+   * Save a bookmark using the moment frozen by [prepareBookmark] (position + thumbnail).
+   * Falls back to the live position/frame if no prepared moment exists.
+   *
+   * The bookmark row is inserted first (so it always exists even if the screenshot failed),
+   * then the thumbnail is written to filesDir/bookmarks/<id>.jpg and linked back.
+   */
+  fun addBookmark(context: Context, tagId: Int?, note: String? = null) {
+    val activity = host as? PlayerActivity ?: return
+    val ctx = activity.currentBookmarkContext() ?: run {
+      Toast.makeText(context, "Unable to bookmark this video", Toast.LENGTH_SHORT).show()
+      return
+    }
+    // Claim the frozen moment synchronously so a later dismiss/discard can't race with us.
+    val frozenPos = _pendingBookmarkPositionMs.value
+    val preparedThumb = pendingBookmarkThumb
+    val preparedJob = pendingThumbJob
+    pendingBookmarkThumb = null
+    _pendingBookmarkPositionMs.value = null
+    pendingThumbJob = null
+
+    viewModelScope.launch(Dispatchers.IO) {
+      val posMs = frozenPos
+        ?: ((MPVLib.getPropertyDouble("time-pos") ?: 0.0) * 1000).toLong().coerceAtLeast(0L)
+      val id =
+        bookmarkRepository.createBookmark(
+          videoUri = ctx.videoUri,
+          videoPath = ctx.videoPath,
+          fileName = ctx.fileName,
+          mediaIdentifier = ctx.mediaIdentifier,
+          positionMs = posMs,
+          durationMs = ctx.durationMs,
+          tagId = tagId,
+          note = note?.takeIf { it.isNotBlank() },
+        ).toInt()
+
+      // Use the frame captured at button-press time; fall back to a live capture if missing.
+      runCatching {
+        val dir = File(context.filesDir, "bookmarks").apply { mkdirs() }
+        val finalThumb = File(dir, "$id.jpg")
+        preparedJob?.join()
+        if (preparedThumb != null && preparedThumb.exists() && preparedThumb.length() > 0) {
+          preparedThumb.copyTo(finalThumb, overwrite = true)
+          preparedThumb.delete()
+          bookmarkRepository.updateThumbnailPath(id, finalThumb.absolutePath)
+        } else {
+          val tmp = File(context.cacheDir, "bm_$id.jpg")
+          MPVLib.command("screenshot-to-file", tmp.absolutePath, "video")
+          delay(200)
+          if (tmp.exists() && tmp.length() > 0) {
+            tmp.copyTo(finalThumb, overwrite = true)
+            tmp.delete()
+            bookmarkRepository.updateThumbnailPath(id, finalThumb.absolutePath)
+          }
+        }
+      }
+
+      withContext(Dispatchers.Main) {
+        Toast.makeText(context, "Bookmark added", Toast.LENGTH_SHORT).show()
+      }
+    }
+  }
+
+  /** Create a tag (or return an existing one with the same name). */
+  suspend fun getOrCreateTag(name: String): Int = bookmarkRepository.getOrCreateTag(name)
 
   // ==================== Playlist Management ====================
 

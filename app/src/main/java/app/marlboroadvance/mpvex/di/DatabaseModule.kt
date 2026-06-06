@@ -450,7 +450,43 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
       } else {
         android.util.Log.d("Migration_8_9", "Schema is correct, no repair needed")
       }
-      
+
+      // ===== Create bookmark tables (TagEntity, BookmarkEntity) =====
+      android.util.Log.d("Migration_8_9", "Creating bookmark tables")
+      db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `TagEntity` (
+          `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+          `name` TEXT NOT NULL,
+          `color` INTEGER,
+          `createdAt` INTEGER NOT NULL
+        )
+        """.trimIndent(),
+      )
+      db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_TagEntity_name` ON `TagEntity` (`name`)")
+
+      db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `BookmarkEntity` (
+          `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+          `videoUri` TEXT NOT NULL,
+          `videoPath` TEXT NOT NULL,
+          `fileName` TEXT NOT NULL,
+          `mediaIdentifier` TEXT NOT NULL,
+          `positionMs` INTEGER NOT NULL,
+          `durationMs` INTEGER NOT NULL,
+          `thumbnailPath` TEXT,
+          `note` TEXT,
+          `tagId` INTEGER,
+          `createdAt` INTEGER NOT NULL,
+          FOREIGN KEY(`tagId`) REFERENCES `TagEntity`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
+        )
+        """.trimIndent(),
+      )
+      db.execSQL("CREATE INDEX IF NOT EXISTS `index_BookmarkEntity_tagId` ON `BookmarkEntity` (`tagId`)")
+      db.execSQL("CREATE INDEX IF NOT EXISTS `index_BookmarkEntity_mediaIdentifier` ON `BookmarkEntity` (`mediaIdentifier`)")
+      db.execSQL("CREATE INDEX IF NOT EXISTS `index_BookmarkEntity_createdAt` ON `BookmarkEntity` (`createdAt`)")
+
       android.util.Log.d("Migration_8_9", "Migration completed successfully")
     } catch (e: Exception) {
       android.util.Log.e("Migration_8_9", "Migration failed", e)
@@ -509,6 +545,12 @@ val DatabaseModule =
     single {
       PlaylistRepository(
         playlistDao = get<MpvExDatabase>().playlistDao(),
+      )
+    }
+
+    single {
+      app.marlboroadvance.mpvex.database.repository.BookmarkRepository(
+        bookmarkDao = get<MpvExDatabase>().bookmarkDao(),
       )
     }
   }

@@ -103,6 +103,39 @@ object MediaUtils {
   }
 
   /**
+   * Play a list of bookmarks as a queue. Each entry loads its video and seeks to the
+   * bookmarked time; the player's next/previous controls walk the queue. The first item
+   * also seeks via the standard "position" extra so the existing first-load path applies.
+   *
+   * @param bookmarks ordered bookmarks to play (e.g. all bookmarks sharing a tag)
+   * @param startIndex index of the bookmark to start from
+   */
+  fun playBookmarks(
+    bookmarks: List<app.marlboroadvance.mpvex.database.entities.BookmarkEntity>,
+    startIndex: Int,
+    context: Context,
+  ) {
+    if (bookmarks.isEmpty()) return
+    val start = startIndex.coerceIn(0, bookmarks.size - 1)
+    val uris = ArrayList(bookmarks.map { it.videoUri.toUri() })
+    val positions = LongArray(bookmarks.size) { bookmarks[it].positionMs }
+
+    val intent = Intent(Intent.ACTION_VIEW, uris[start]).apply {
+      setClass(context, PlayerActivity::class.java)
+      addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+      addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      putExtra("internal_launch", true)
+      putParcelableArrayListExtra("playlist", uris)
+      putExtra("playlist_index", start)
+      putExtra("playlist_positions", positions)
+      // First-item seek through the existing setIntentExtras path (expects milliseconds).
+      putExtra("position", bookmarks[start].positionMs.toInt())
+      putExtra("launch_source", "bookmarks")
+    }
+    context.startActivity(intent)
+  }
+
+  /**
    * @deprecated Use RecentlyPlayedOps.getLastPlayed() directly
    */
   @Deprecated(

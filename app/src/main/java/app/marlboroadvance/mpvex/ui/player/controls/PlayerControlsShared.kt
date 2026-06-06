@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.CameraAlt
@@ -211,6 +212,20 @@ fun RenderPlayerButton(
           modifier = Modifier.size(buttonSize),
         )
       }
+    }
+
+    PlayerButton.ADD_BOOKMARK -> {
+      val bookmarkContext = LocalContext.current
+      ControlsButton(
+        icon = Icons.Default.BookmarkAdd,
+        onClick = {
+          // Freeze the position + frame at press time, then open the tag sheet.
+          viewModel.prepareBookmark(bookmarkContext)
+          onOpenSheet(Sheets.AddBookmark)
+        },
+        color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.size(buttonSize),
+      )
     }
 
     PlayerButton.PLAYBACK_SPEED -> {

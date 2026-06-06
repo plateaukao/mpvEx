@@ -252,59 +252,73 @@ object PlaylistScreen : Screen {
           }
         }
       ) { paddingValues ->
-        if (isSearching && filteredPlaylists.isEmpty() && searchQuery.isNotBlank()) {
-          // Show "no results" for search
-          Box(
-            modifier = Modifier
-              .fillMaxSize()
-              .padding(paddingValues),
-            contentAlignment = Alignment.Center,
-          ) {
-            EmptyState(
-              icon = Icons.Filled.Search,
-              title = "No playlists found",
-              message = "Try a different search term",
+        Column(modifier = Modifier.fillMaxSize().padding(top = paddingValues.calculateTopPadding())) {
+          // Bookmark tags ("each tag is a playlist") surfaced inside the Playlists tab.
+          if (!selectionManager.isInSelectionMode && !isSearching) {
+            app.marlboroadvance.mpvex.ui.browser.bookmarks.BookmarkTagsSection(
+              onOpenTag = { screen -> backStack.add(screen) },
             )
           }
-        } else if (playlistsWithCount.isEmpty() && hasCompletedInitialLoad) {
-          Box(
-            modifier = Modifier
-              .fillMaxSize()
-              .padding(paddingValues),
-            contentAlignment = Alignment.Center,
-          ) {
-            Column(
-              horizontalAlignment = Alignment.CenterHorizontally,
-              verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-              EmptyState(
-                icon = Icons.AutoMirrored.Outlined.PlaylistAdd,
-                title = "No playlists yet",
-                message = "Create a playlist or add one from an m3u URL",
+
+          Box(modifier = Modifier.weight(1f)) {
+            val bottomPadding = androidx.compose.foundation.layout.PaddingValues(
+              bottom = paddingValues.calculateBottomPadding(),
+            )
+            if (isSearching && filteredPlaylists.isEmpty() && searchQuery.isNotBlank()) {
+              // Show "no results" for search
+              Box(
+                modifier = Modifier
+                  .fillMaxSize()
+                  .padding(bottomPadding),
+                contentAlignment = Alignment.Center,
+              ) {
+                EmptyState(
+                  icon = Icons.Filled.Search,
+                  title = "No playlists found",
+                  message = "Try a different search term",
+                )
+              }
+            } else if (playlistsWithCount.isEmpty() && hasCompletedInitialLoad) {
+              Box(
+                modifier = Modifier
+                  .fillMaxSize()
+                  .padding(bottomPadding),
+                contentAlignment = Alignment.Center,
+              ) {
+                Column(
+                  horizontalAlignment = Alignment.CenterHorizontally,
+                  verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                  EmptyState(
+                    icon = Icons.AutoMirrored.Outlined.PlaylistAdd,
+                    title = "No playlists yet",
+                    message = "Create a playlist or add one from an m3u URL",
+                  )
+                }
+              }
+            } else {
+              PlaylistListContent(
+                playlistsWithCount = filteredPlaylists,
+                listState = listState,
+                gridState = gridState,
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.refresh() },
+                selectionManager = selectionManager,
+                onPlaylistClick = { playlistWithCount ->
+                  if (selectionManager.isInSelectionMode) {
+                    selectionManager.toggle(playlistWithCount)
+                  } else {
+                    backStack.add(PlaylistDetailScreen(playlistWithCount.playlist.id))
+                  }
+                },
+                onPlaylistLongClick = { playlistWithCount ->
+                  selectionManager.toggle(playlistWithCount)
+                },
+                modifier = Modifier.padding(bottomPadding),
+                isInSelectionMode = selectionManager.isInSelectionMode,
               )
             }
           }
-        } else {
-          PlaylistListContent(
-            playlistsWithCount = filteredPlaylists,
-            listState = listState,
-            gridState = gridState,
-            isRefreshing = isRefreshing,
-            onRefresh = { viewModel.refresh() },
-            selectionManager = selectionManager,
-            onPlaylistClick = { playlistWithCount ->
-              if (selectionManager.isInSelectionMode) {
-                selectionManager.toggle(playlistWithCount)
-              } else {
-                backStack.add(PlaylistDetailScreen(playlistWithCount.playlist.id))
-              }
-            },
-            onPlaylistLongClick = { playlistWithCount ->
-              selectionManager.toggle(playlistWithCount)
-            },
-            modifier = Modifier.padding(paddingValues),
-            isInSelectionMode = selectionManager.isInSelectionMode,
-          )
         }
       }
 

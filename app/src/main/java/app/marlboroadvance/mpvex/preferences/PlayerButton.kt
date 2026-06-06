@@ -5,6 +5,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Segment
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.Audiotrack
+import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Camera
 import androidx.compose.material.icons.outlined.LockOpen
@@ -40,6 +41,7 @@ enum class PlayerButton(
   BACK_ARROW(Icons.AutoMirrored.Outlined.ArrowBack),
   VIDEO_TITLE(Icons.Outlined.Title),
   BOOKMARKS_CHAPTERS(Icons.Outlined.Bookmarks),
+  ADD_BOOKMARK(Icons.Outlined.BookmarkAdd),
   PLAYBACK_SPEED(Icons.Outlined.Speed),
   DECODER(Icons.Outlined.Memory),
   SCREEN_ROTATION(Icons.Outlined.ScreenRotation),
@@ -86,6 +88,7 @@ fun getPlayerButtonLabel(button: PlayerButton): String =
     PlayerButton.BACK_ARROW -> "Back Arrow" // stringResource(R.string.btn_label_back)
     PlayerButton.VIDEO_TITLE -> "Video Title" // stringResource(R.string.btn_label_title)
     PlayerButton.BOOKMARKS_CHAPTERS -> "Chapters / Bookmarks" // stringResource(R.string.btn_label_bookmarks)
+    PlayerButton.ADD_BOOKMARK -> "Add Bookmark"
     PlayerButton.PLAYBACK_SPEED -> "Playback Speed" // stringResource(R.string.btn_label_speed)
     PlayerButton.DECODER -> "Decoder" // stringResource(R.string.btn_label_decoder)
     PlayerButton.SCREEN_ROTATION -> "Screen Rotation" // stringResource(R.string.btn_label_rotation)

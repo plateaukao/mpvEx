@@ -1,6 +1,7 @@
 package app.marlboroadvance.mpvex
 
 import android.app.Application
+import app.marlboroadvance.mpvex.database.repository.BookmarkRepository
 import app.marlboroadvance.mpvex.database.repository.VideoMetadataCacheRepository
 import app.marlboroadvance.mpvex.di.DatabaseModule
 import app.marlboroadvance.mpvex.di.FileManagerModule
@@ -22,6 +23,7 @@ import org.koin.core.annotation.KoinExperimentalAPI
 class App : Application() {
   private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private val metadataCache: VideoMetadataCacheRepository by inject()
+  private val bookmarkRepository: BookmarkRepository by inject()
 
   override fun onCreate() {
     super.onCreate()
@@ -52,6 +54,13 @@ class App : Application() {
     applicationScope.launch {
       runCatching {
         triggerMediaScanOnLaunch()
+      }
+    }
+
+    // Remove bookmark thumbnail files with no matching bookmark (non-blocking).
+    applicationScope.launch {
+      runCatching {
+        bookmarkRepository.sweepOrphanThumbnails(java.io.File(filesDir, "bookmarks"))
       }
     }
   }

@@ -12,6 +12,7 @@ import app.marlboroadvance.mpvex.ui.player.Decoder
 import app.marlboroadvance.mpvex.ui.player.Panels
 import app.marlboroadvance.mpvex.ui.player.Sheets
 import app.marlboroadvance.mpvex.ui.player.TrackNode
+import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.AddBookmarkSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.AspectRatioSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.AudioTracksSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.ChaptersSheet
@@ -27,6 +28,7 @@ import app.marlboroadvance.mpvex.utils.media.MediaInfoParser
 import dev.vivvvek.seeker.Segment
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import androidx.compose.runtime.collectAsState as composeCollectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -351,6 +353,29 @@ fun PlayerSheets(
           playerPreferences = playerPreferences,
         )
       }
+    }
+
+    Sheets.AddBookmark -> {
+      val context = androidx.compose.ui.platform.LocalContext.current
+      val scope = androidx.compose.runtime.rememberCoroutineScope()
+      val tags by viewModel.tagsWithCounts.collectAsState()
+      // Position frozen when the button was pressed (not the live, advancing position).
+      val pendingPositionMs by viewModel.pendingBookmarkPositionMs.collectAsState()
+      AddBookmarkSheet(
+        tags = tags,
+        positionLabel = `is`.xyz.mpv.Utils.prettyTime(((pendingPositionMs ?: 0L) / 1000).toInt()),
+        onSave = { selectedTagId, newTagName, note ->
+          scope.launch {
+            val tagId = newTagName?.let { viewModel.getOrCreateTag(it).takeIf { id -> id > 0 } } ?: selectedTagId
+            viewModel.addBookmark(context, tagId, note)
+            onDismissRequest()
+          }
+        },
+        onDismissRequest = {
+          viewModel.discardPendingBookmark()
+          onDismissRequest()
+        },
+      )
     }
   }
 }

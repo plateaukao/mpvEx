@@ -19,7 +19,7 @@ class BookmarkRepository(private val bookmarkDao: BookmarkDao) {
     tagId: Int?,
     note: String? = null,
   ): Long {
-    return bookmarkDao.insertBookmark(
+    val id = bookmarkDao.insertBookmark(
       BookmarkEntity(
         videoUri = videoUri,
         videoPath = videoPath,
@@ -33,6 +33,12 @@ class BookmarkRepository(private val bookmarkDao: BookmarkDao) {
         createdAt = System.currentTimeMillis(),
       ),
     )
+    // Merge near-duplicates: a same-video, same-tag bookmark within DEDUP_WINDOW_MS of this
+    // one marks the same moment — drop the older one(s) and keep the new bookmark.
+    bookmarkDao
+      .findNearbyBookmarks(mediaIdentifier, id.toInt(), tagId, positionMs, DEDUP_WINDOW_MS)
+      .forEach { deleteBookmark(it) }
+    return id
   }
 
   suspend fun updateThumbnailPath(id: Int, path: String?) = bookmarkDao.updateThumbnailPath(id, path)
@@ -95,5 +101,10 @@ class BookmarkRepository(private val bookmarkDao: BookmarkDao) {
         runCatching { file.delete() }
       }
     }
+  }
+
+  companion object {
+    /** A new bookmark within this window of an existing same-video, same-tag bookmark replaces it. */
+    private const val DEDUP_WINDOW_MS = 20_000L
   }
 }

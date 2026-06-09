@@ -38,6 +38,28 @@ interface BookmarkDao {
   @Query("SELECT * FROM BookmarkEntity WHERE id = :id")
   suspend fun getBookmarkById(id: Int): BookmarkEntity?
 
+  /**
+   * Find existing bookmarks of the same video and same tag whose timestamp is within
+   * [windowMs] of [positionMs], excluding [excludeId]. Used to merge near-duplicate
+   * bookmarks of the same moment. `tagId IS :tagId` matches null-to-null (both untagged).
+   */
+  @Query(
+    """
+    SELECT * FROM BookmarkEntity
+    WHERE mediaIdentifier = :mediaIdentifier
+      AND id != :excludeId
+      AND tagId IS :tagId
+      AND ABS(positionMs - :positionMs) <= :windowMs
+    """,
+  )
+  suspend fun findNearbyBookmarks(
+    mediaIdentifier: String,
+    excludeId: Int,
+    tagId: Int?,
+    positionMs: Long,
+    windowMs: Long,
+  ): List<BookmarkEntity>
+
   @Query("SELECT * FROM BookmarkEntity ORDER BY createdAt DESC")
   fun observeAllBookmarks(): Flow<List<BookmarkEntity>>
 

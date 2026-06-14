@@ -1013,6 +1013,14 @@ fun PlayerControls(
       onDismissRequest = { onOpenSheet(Sheets.None) },
     )
 
+    val isTrimming by viewModel.isTrimming.collectAsState()
+    if (isTrimming) {
+      val trimProgress by viewModel.trimProgress.collectAsState()
+      app.marlboroadvance.mpvex.ui.player.controls.components.sheets.TrimProgressDialog(
+        progress = trimProgress,
+      )
+    }
+
     val panel by viewModel.panelShown.collectAsState()
     PlayerPanels(
       panelShown = panel,

@@ -55,6 +55,32 @@ class BookmarkRepository(private val bookmarkDao: BookmarkDao) {
     bookmarkDao.deleteBookmark(bookmark)
   }
 
+  /**
+   * Rebase bookmarks for [mediaIdentifier] after a head/tail trim. Bookmarks inside the kept
+   * range `[prefixMs, prefixMs + keptDurationMs]` are shifted left by [prefixMs] and re-stamped
+   * with the new duration; bookmarks that fell in the cropped head or tail are deleted (their
+   * moment no longer exists).
+   */
+  suspend fun shiftBookmarksAfterTrim(
+    mediaIdentifier: String,
+    prefixMs: Long,
+    keptDurationMs: Long,
+  ) {
+    val endMs = prefixMs + keptDurationMs
+    bookmarkDao.getBookmarksByMedia(mediaIdentifier).forEach { bookmark ->
+      if (bookmark.positionMs < prefixMs || bookmark.positionMs > endMs) {
+        deleteBookmark(bookmark)
+      } else {
+        bookmarkDao.updateBookmark(
+          bookmark.copy(
+            positionMs = bookmark.positionMs - prefixMs,
+            durationMs = keptDurationMs,
+          ),
+        )
+      }
+    }
+  }
+
   fun observeAllBookmarks(): Flow<List<BookmarkEntity>> = bookmarkDao.observeAllBookmarks()
 
   fun observeBookmarksForTag(tagId: Int): Flow<List<BookmarkEntity>> = bookmarkDao.observeBookmarksForTag(tagId)

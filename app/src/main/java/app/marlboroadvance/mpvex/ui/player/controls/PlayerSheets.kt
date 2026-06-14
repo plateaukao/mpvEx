@@ -23,6 +23,7 @@ import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaybackSp
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaylistSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.SubtitlesSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.OnlineSubtitleSearchSheet
+import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.TrimSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.VideoZoomSheet
 import app.marlboroadvance.mpvex.utils.media.MediaInfoParser
 import dev.vivvvek.seeker.Segment
@@ -239,7 +240,28 @@ fun PlayerSheets(
         onDismissRequest = onDismissRequest,
         onEnterFiltersPanel = { onOpenPanel(Panels.VideoFilters) },
         onAnime4KChanged = { },
+        onTrimVideo = { onShowSheet(Sheets.VideoTrim) },
       )
+    }
+
+    Sheets.VideoTrim -> {
+      val context = androidx.compose.ui.platform.LocalContext.current
+      val trimSource = remember { viewModel.currentTrimSource() }
+      if (trimSource == null) {
+        LaunchedEffect(Unit) { onDismissRequest() }
+      } else {
+        TrimSheet(
+          durationMs = trimSource.durationMs,
+          previewUri = trimSource.uri,
+          previewPath = trimSource.path,
+          previewName = trimSource.name,
+          onTrim = { startMs, endMs ->
+            viewModel.trimVideo(context, startMs, endMs)
+            onDismissRequest()
+          },
+          onDismissRequest = onDismissRequest,
+        )
+      }
     }
 
     Sheets.PlaybackSpeed -> {

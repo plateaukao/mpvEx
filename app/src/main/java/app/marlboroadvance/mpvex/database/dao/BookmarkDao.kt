@@ -60,6 +60,10 @@ interface BookmarkDao {
     windowMs: Long,
   ): List<BookmarkEntity>
 
+  /** All bookmarks of a given video; used to rebase positions after a trim. */
+  @Query("SELECT * FROM BookmarkEntity WHERE mediaIdentifier = :mediaIdentifier")
+  suspend fun getBookmarksByMedia(mediaIdentifier: String): List<BookmarkEntity>
+
   @Query("SELECT * FROM BookmarkEntity ORDER BY createdAt DESC")
   fun observeAllBookmarks(): Flow<List<BookmarkEntity>>
 

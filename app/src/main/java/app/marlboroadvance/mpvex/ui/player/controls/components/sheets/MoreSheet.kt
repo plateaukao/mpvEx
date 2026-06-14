@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.AlertDialog
@@ -65,6 +66,7 @@ fun MoreSheet(
   onDismissRequest: () -> Unit,
   onEnterFiltersPanel: () -> Unit,
   onAnime4KChanged: () -> Unit = {},
+  onTrimVideo: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   val advancedPreferences = koinInject<AdvancedPreferences>()
@@ -144,6 +146,33 @@ val scope = rememberCoroutineScope()
           }
         }
       }
+
+      Surface(
+        onClick = onTrimVideo,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Row(
+          modifier = Modifier.padding(MaterialTheme.spacing.medium),
+          horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Icon(imageVector = Icons.Default.ContentCut, contentDescription = null)
+          Column {
+            Text(
+              text = "Trim video",
+              style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+              text = "Crop the start or end (lossless)",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+        }
+      }
+
       Text(
         text = stringResource(R.string.player_sheets_stats_page_title),
         style = MaterialTheme.typography.titleMedium,

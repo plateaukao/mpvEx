@@ -3289,6 +3289,19 @@ class PlayerActivity :
     )
   }
 
+  /**
+   * Re-open the currently playing file from the start. Used after an in-place edit (e.g. a trim)
+   * overwrites the file so mpv reads the new content. A fresh content fd is opened for SAF uris.
+   */
+  fun reloadCurrentVideo() {
+    val uri = playlist.getOrNull(playlistIndex) ?: extractUriFromIntent(intent) ?: return
+    val uriStr = uri.toString()
+    val playable = if (uriStr.startsWith("content://")) uriStr.toUri().openContentFd(this) else uriStr
+    if (playable != null) {
+      lifecycleScope.launch(Dispatchers.Default) { MPVLib.command("loadfile", playable) }
+    }
+  }
+
   private fun generatePlaylistFromFolder(currentPath: String) {
     lifecycleScope.launch(Dispatchers.IO) {
       runCatching {

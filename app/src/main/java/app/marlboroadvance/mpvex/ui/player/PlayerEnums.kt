@@ -103,6 +103,7 @@ enum class Sheets {
   Playlist,
   FrameNavigation,
   AddBookmark,
+  VideoTrim,
 }
 
 enum class Panels {

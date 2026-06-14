@@ -24,6 +24,7 @@ import app.marlboroadvance.mpvex.repository.wyzie.WyzieSearchRepository
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieSubtitle
 import app.marlboroadvance.mpvex.utils.media.ChecksumUtils
 import app.marlboroadvance.mpvex.utils.media.MediaInfoParser
+import app.marlboroadvance.mpvex.utils.media.VideoTrimmer
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -306,6 +307,12 @@ class PlayerViewModel(
 
   private val _isABLoopExpanded = MutableStateFlow(false)
   val isABLoopExpanded: StateFlow<Boolean> = _isABLoopExpanded.asStateFlow()
+
+  // Video trim state (lossless head/tail crop)
+  private val _isTrimming = MutableStateFlow(false)
+  val isTrimming: StateFlow<Boolean> = _isTrimming.asStateFlow()
+  private val _trimProgress = MutableStateFlow(0f)
+  val trimProgress: StateFlow<Float> = _trimProgress.asStateFlow()
 
   // Mirroring state
   private val _isMirrored = MutableStateFlow(false)
@@ -1520,6 +1527,138 @@ class PlayerViewModel(
 
   /** Create a tag (or return an existing one with the same name). */
   suspend fun getOrCreateTag(name: String): Int = bookmarkRepository.getOrCreateTag(name)
+
+  // ==================== Video Trim ====================
+
+  /** Current video duration in milliseconds (for the trim range slider). */
+  fun currentDurationMs(): Long = ((MPVLib.getPropertyDouble("duration") ?: 0.0) * 1000).toLong()
+
+  /** Source of the currently playing video for the trim sheet (range + preview). */
+  data class TrimSource(val uri: Uri, val path: String, val name: String, val durationMs: Long)
+
+  fun currentTrimSource(): TrimSource? {
+    val ctx = (host as? PlayerActivity)?.currentBookmarkContext() ?: return null
+    return TrimSource(
+      uri = Uri.parse(ctx.videoUri),
+      path = ctx.videoPath,
+      name = ctx.fileName,
+      durationMs = ctx.durationMs,
+    )
+  }
+
+  /**
+   * Losslessly crop the current video to the kept range `[startMs, endMs]` and overwrite the
+   * original file. Runs off the main thread; pauses playback during the rewrite and reloads the
+   * trimmed file on success. The original is only replaced after the trimmed temp file is fully
+   * written, so a failure leaves it untouched.
+   */
+  fun trimVideo(context: Context, startMs: Long, endMs: Long) {
+    if (_isTrimming.value) return
+    val activity = host as? PlayerActivity ?: return
+    val ctx = activity.currentBookmarkContext() ?: run {
+      showToast("Unable to trim this video")
+      return
+    }
+    val sourceUri = Uri.parse(ctx.videoUri)
+    if (sourceUri.scheme != "file" && sourceUri.scheme != "content") {
+      showToast("Can only trim local files")
+      return
+    }
+
+    _isTrimming.value = true
+    _trimProgress.value = 0f
+    val wasPaused = MPVLib.getPropertyBoolean("pause") ?: false
+    MPVLib.setPropertyBoolean("pause", true)
+
+    viewModelScope.launch(Dispatchers.IO) {
+      val temp = File(context.cacheDir, "trim_${System.currentTimeMillis()}.mp4")
+      val result =
+        VideoTrimmer.trim(
+          context = context,
+          sourceUri = sourceUri,
+          startMs = startMs,
+          endMs = endMs,
+          outputFile = temp,
+          onProgress = { p -> _trimProgress.value = p },
+        )
+
+      when (result) {
+        is VideoTrimmer.TrimResult.Error -> {
+          runCatching { temp.delete() }
+          withContext(Dispatchers.Main) {
+            _isTrimming.value = false
+            MPVLib.setPropertyBoolean("pause", wasPaused)
+            showToast("Trim failed: ${result.message}")
+          }
+        }
+
+        is VideoTrimmer.TrimResult.Success -> {
+          val replaced = runCatching { replaceOriginal(context, sourceUri, temp) }.getOrDefault(false)
+          runCatching { temp.delete() }
+          if (!replaced) {
+            withContext(Dispatchers.Main) {
+              _isTrimming.value = false
+              MPVLib.setPropertyBoolean("pause", wasPaused)
+              showToast("Couldn't save trimmed file")
+            }
+            return@launch
+          }
+          // Rebase bookmarks for this video onto the new (shorter) timeline.
+          runCatching {
+            bookmarkRepository.shiftBookmarksAfterTrim(
+              mediaIdentifier = ctx.mediaIdentifier,
+              prefixMs = result.startOffsetMs,
+              keptDurationMs = result.newDurationMs,
+            )
+          }
+          // The file changed on disk: re-index it in MediaStore so its size/date/duration update.
+          // The library's poster thumbnail is cached by those values, so this regenerates it on
+          // the next browse (the cropped head means the poster frame changed).
+          if (sourceUri.scheme == "file") {
+            sourceUri.path?.let { path ->
+              runCatching {
+                android.media.MediaScannerConnection.scanFile(context, arrayOf(path), null, null)
+              }
+            }
+          }
+          withContext(Dispatchers.Main) {
+            _isTrimming.value = false
+            activity.reloadCurrentVideo()
+            showToast("Video trimmed")
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Overwrite the original file with the trimmed [temp]. For `file://` paths the temp is staged
+   * as a sibling and renamed in place (atomic on the same filesystem); for `content://` the
+   * destination is truncated and rewritten via the resolver. Returns false on any failure.
+   */
+  private fun replaceOriginal(context: Context, sourceUri: Uri, temp: File): Boolean =
+    when (sourceUri.scheme) {
+      "file" -> {
+        val dest = File(sourceUri.path ?: return false)
+        val staged = File(dest.parentFile, ".${dest.name}.trimtmp")
+        temp.copyTo(staged, overwrite = true)
+        if (!staged.renameTo(dest)) {
+          // Cross-filesystem or replace-existing not supported: fall back to in-place overwrite.
+          temp.copyTo(dest, overwrite = true)
+          runCatching { staged.delete() }
+        }
+        true
+      }
+
+      "content" -> {
+        context.contentResolver.openOutputStream(sourceUri, "wt")?.use { output ->
+          temp.inputStream().use { input -> input.copyTo(output) }
+          true
+        } ?: false
+      }
+
+      else -> false
+    }
 
   // ==================== Playlist Management ====================
 

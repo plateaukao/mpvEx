@@ -901,7 +901,9 @@ class PlayerViewModel(
   fun seekTo(position: Int) {
     viewModelScope.launch(Dispatchers.IO) {
       val maxDuration = MPVLib.getPropertyInt("duration") ?: 0
-      var clampedPosition = position.coerceIn(0, maxDuration)
+      // Stop 1s short of the end: seeking to the exact end fires EOF, which
+      // auto-advances the playlist — never intended from a seekbar tap/drag.
+      var clampedPosition = position.coerceIn(0, (maxDuration - 1).coerceAtLeast(0))
 
       // Clamp within AB loop if active
       val loopA = _abLoopA.value
@@ -939,8 +941,9 @@ class PlayerViewModel(
           val currentPos = MPVLib.getPropertyInt("time-pos") ?: 0
           
           if (duration > 0 && currentPos + toApply >= duration) {
-              // If seeking past the end, force seek to 100% absolute to ensure EOF is triggered
-              MPVLib.command("seek", "100", "absolute-percent+exact")
+              // A relative seek past the end lands 1s short of it instead of forcing
+              // EOF — a double-tap/skip must never jump to the next video by itself.
+              MPVLib.command("seek", (duration - 1).coerceAtLeast(0).toString(), "absolute+exact")
           } else {
               // Use precise seeking for videos shorter than 2 minutes (120 seconds) or if preference is enabled
               val shouldUsePreciseSeeking = playerPreferences.usePreciseSeeking.get() || duration < 120
